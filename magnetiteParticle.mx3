@@ -1,5 +1,5 @@
 SetGridsize(512, 512, 1) 
-SetCellsize(1500e-9/512, 1500e-9/512, 10e-9/512) 
+SetCellsize(1500e-9/512, 1500e-9/512, 10e-9) 
 // around 3nm cell size, 1500 is 5times unit cell(300e-9*300e-9)
 setPBC(4,4,1)
 
