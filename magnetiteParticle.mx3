@@ -1,0 +1,92 @@
+SetGridsize(512, 512, 1) 
+SetCellsize(1500e-9/512, 1500e-9/512, 10e-9/512) 
+// around 3nm cell size, 1500 is 5times unit cell(300e-9*300e-9)
+setPBC(4,4,1)
+
+EdgeSmooth = 8
+
+// Magnetic parameters for magnetite (Fe3O4) taken from
+// https://doi.org/10.10https://doi.org/10.1029/98JB0112029/98JB01120:
+
+Msat  = 800e3 // Saturation magnetization in A/m
+Aex   = 13e-12 // Exchange stiffness in J/m
+Ku1   = 0e3 // First-order magnetocrystalline anisotropy in J/m3
+anisU = vector(1,0,0) //
+alpha = 0.006 // Dimensionless damping parameter
+
+//shapes
+//cylinders: size being: 50e-9 diameter, 10e-9 thickness
+//translation: half a gap size  + radius = 75e-9 + (50e-9)/2
+leftCyl := cylinder(50e-9, 10e-9).transl(-100e-9,0,0)
+rightCyl := cylinder(50e-9, 10e-9).transl(100e-9,0,0)
+upCyl := cylinder(50e-9, 10e-9).transl(0,100e-9,0)
+downCyl := cylinder(50e-9, 10e-9).transl(0,-100e-9,0)
+
+//Cuboids - size being length 50e-9, width 50e-9 and thickness 10e-9
+//translation(nm) -  half the gap length + radius + half the rectang = 150/2 + 50/2 + 50/2
+leftCub := cuboid(50e-9, 50e-9, 10e-9).transl(-125e-9,0,0)
+rightCub := cuboid(50e-9, 50e-9, 10e-9).transl(125e-9,0,0)
+upCub := cuboid(50e-9, 50e-9, 10e-9).transl(0,125e-9,0)
+downCub := cuboid(50e-9, 50e-9, 10e-9).transl(0,-125e-9,0) //half the gap length,
+
+//adding all the shapes together
+allShapes := leftCyl.add(rightCyl).add(upCyl).add(downCyl).add(leftCub).add(rightCub).add(upCub).add(downCub).repeat(300e-9,300e-9,0)
+
+
+setgeom( allShapes )
+saveas(geom, "cell")
+
+// We begin by setting every micromagnetic cell to have a random
+// magnetization direction and then relax to an energy minimum.
+// Note that Mumax has two energy minimization methods: relax()
+// and minimize().
+
+// relax() attempts to find a global energy minimum, but can be slow.
+// minimize() quickly finds the nearest local minimum and is best used
+// after a small perturabation is applied to an already-relaxed state.
+
+m = randomMag()
+relax()         // high-energy states best minimized by relax()
+
+// It is worth saving the relaxed state so we can skip the relax()
+// step if we need to repeat the simulation in the future.
+
+saveas(m, "relaxed")
+
+// If a saved OVF of a previously relaxed state is available, we can
+// load it using the following command
+
+// m.loadfile("relaxed.ovf")
+
+// We will now apply a magnetic field at an angle theta to the anisotropy
+// axis and record the hysteresis loop. We introduce a small angular offset
+// from the nominal angle so that the alignment between the anisotropy axis
+// and the field isn't "too perfect" .
+
+Bmax   := 100.0e-3 // Maximum field in Tesla
+Bstep  :=  5.0e-3 // Field step size in Tesla
+theta  := 45 // angle between the field and anisotropy axis in degrees
+offset := 0.01 // offset angle in degrees
+MinimizerStop = 1e-6 // Convergence condition for minimize()
+TableAdd(B_ext)
+
+for B:=0.0; B<=Bmax; B+=Bstep{
+    B_ext = vector(B*cos((theta+offset)*pi/180), B*sin((theta+offset)*pi/180), 0)
+    minimize()   // small changes best minimized by minimize()
+    tablesave()
+	if abs(Mod(B,25e-3)) < Bstep/2 {save(m); print(B)} // Save magnetisation at every 100 mT.
+}
+
+for B:=Bmax; B>=-Bmax; B-=Bstep{
+    B_ext = vector(B*cos((theta+offset)*pi/180), B*sin((theta+offset)*pi/180), 0)
+    minimize()   // small changes best minimized by minimize()
+    tablesave()
+	if abs(Mod(B,25e-3)) < Bstep/2 {save(m); print(B)}
+}
+
+for B:=-Bmax; B<=Bmax; B+=Bstep{
+    B_ext = vector(B*cos((theta+offset)*pi/180), B*sin((theta+offset)*pi/180), 0)
+    minimize()   // small changes best minimized by minimize()
+    tablesave()
+	if abs(Mod(B,25e-3)) < Bstep/2 {save(m); print(B)}
+}
