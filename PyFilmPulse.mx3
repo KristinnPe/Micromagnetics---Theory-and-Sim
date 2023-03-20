@@ -1,0 +1,87 @@
+SetGridsize(512, 512, 1) 
+SetCellsize(1500e-9/512, 1500e-9/512, 10e-9) 
+// around 3nm cell size, 1500 is 5times unit cell(300e-9*300e-9)
+setPBC(4,4,1)
+
+EdgeSmooth = 8
+
+// Magnetic parameters for magnetite (Fe3O4) taken from
+// https://doi.org/10.10https://doi.org/10.1029/98JB0112029/98JB01120:
+
+Msat  = 800e3 // Saturation magnetization in A/m
+Aex   = 13e-12 // Exchange stiffness in J/m
+Ku1   = 0e3 // First-order magnetocrystalline anisotropy in J/m3
+anisU = vector(1,0,0) //
+alpha = 0.006 // Dimensionless damping parameter
+
+//shapes
+//cylinders: size being: 50e-9 diameter, 10e-9 thickness
+//translation: half a gap size  + radius = 75e-9 + (50e-9)/2
+leftCyl := cylinder(50e-9, 10e-9).transl(-100e-9,0,0)
+rightCyl := cylinder(50e-9, 10e-9).transl(100e-9,0,0)
+upCyl := cylinder(50e-9, 10e-9).transl(0,100e-9,0)
+downCyl := cylinder(50e-9, 10e-9).transl(0,-100e-9,0)
+
+//Cuboids - size being length 50e-9, width 50e-9 and thickness 10e-9
+//translation(nm) -  half the gap length + radius + half the rectang = 150/2 + 50/2 + 50/2
+leftCub := cuboid(50e-9, 50e-9, 10e-9).transl(-125e-9,0,0)
+rightCub := cuboid(50e-9, 50e-9, 10e-9).transl(125e-9,0,0)
+upCub := cuboid(50e-9, 50e-9, 10e-9).transl(0,125e-9,0)
+downCub := cuboid(50e-9, 50e-9, 10e-9).transl(0,-125e-9,0) //half the gap length,
+
+//adding all the shapes together
+allShapes := leftCyl.add(rightCyl).add(upCyl).add(downCyl).add(leftCub).add(rightCub).add(upCub).add(downCub).repeat(300e-9,300e-9,0)
+
+
+setgeom( allShapes )
+saveas(geom, "cell")
+
+// Material Parameters for Permalloy
+
+Msat = 800e3 // A/m
+Aex = 13e-12 // J/m
+alpha = 0.006
+
+// Calculate required sampling - the Nyquist sampling theorem tells us that
+// we need to save our data at least at double the frequency of the fastest
+// process we care about.
+//
+// The Fast Fourier Transform will give a frequency resolution of our Nyqyuist
+// frequency divided by the number of time steps in the simulation.
+
+pamp:= 0.002 // maximum amplitude of applied pulse in T.
+pwait:= 10e-9+50e-12 // Location in time of pulse peak in s, including 50 ns relaxation time before the pulse.
+fcut:= 25e9 // Cut-off frequency for SincPulse in Hz.
+
+Nyquist:= 1./(2.*fcut) // Time step required to sample at Nyquist frequency for fcut.
+fres:= 0.05e9 // Desired frequency resolution in Hz.
+stepNo:= 1./(Nyquist*fres) // Number of time steps required for FFT resolution to match fres.
+stepNo2:= 2*pow(2, ilogb(stepNo)) // Convert to power of 2 for efficient FFT while keeping resolution better than fres.
+print("Nyquist time interval:",Nyquist)
+print("Number of time steps:",stepNo2)
+
+// Initialise
+
+m = uniform(-1, -1, 0)
+relax()
+saveas(m,"init")    // relaxed state
+//changed -100e-3, -50e-3, 0, 50e-3 and 100e-3
+Bx := -100e-3 
+theta := 45
+B_ext = vector(Bx*cos(theta*pi/180), Bx*sin(theta*pi/180), 0)
+relax()
+run(10e-9) // Allowing the magnetisation to relax under time evolution reduces low frequency noise.
+saveas(m, "loadfile") // Save relaxed state
+
+// Sinc pulse in the z-direction with static field along x.
+B_ext = vector(Bx*cos(theta*pi/180), Bx*sin(theta*pi/180), (pamp*sin(2.*pi*fcut*(t-pwait)))/(2.*pi*fcut*(t-pwait)))
+
+
+// We only add our table now, so the 50 ns of relaxation time are not saved.
+tableAdd(E_total)
+tableadd(B_ext)
+//autosave(m, Nyquist)
+tableautosave(Nyquist)
+
+MaxDt = Nyquist // We explicitly tell mumax not to use a timestep greater than our Nyquist time.
+run((stepNo2)*Nyquist)
