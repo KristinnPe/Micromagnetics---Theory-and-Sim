@@ -58,7 +58,8 @@ for f in files:
 
 """## Postprocessing
 
-Complete the code block below to plot the magnetisation along the long axis of the ellipsoid as a function of the applied field along this axis to determine the coercive field.
+Complete the code block below to plot the magnetisation along the long axis of 
+the ellipsoid as a function of the applied field along this axis to determine the coercive field.
 
 How does this compare with the value of $H_c$ predicted by the Stoner Wohlfarth model?
 """
@@ -123,7 +124,7 @@ def interpolating(x1, x2, y1, y2):
     return result
 
 folder = "magnetiteParticle.out"
-data = np.loadtxt('/Users/kristinnpetursson/Downloads/Miniproj/Part 1 - full gap angle 45/table.txt',skiprows=1)
+data = np.loadtxt('magnetiteParticle.out/micro/table.txt',skiprows=1)
 
 mx = np.array( [d[1] for d in data] )
 my = np.array([d[2] for d in data] )
